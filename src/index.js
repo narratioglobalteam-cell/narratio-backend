@@ -1,49 +1,44 @@
-﻿import http from 'http';
+const express = require('express');
 
-const port = process.env.PORT || 5050;
+const app = express();
 
-// Разрешённые источники (в НИЖНЕМ регистре)
-const ALLOWED_ORIGINS = new Set([
-  'https://narratioglobalteam-cell.github.io', // GitHub Pages (фронт)
-  'http://127.0.0.1:8090',                      // локальный фронт
-]);
-
-const server = http.createServer((req, res) => {
-  const originRaw = req.headers.origin || '';
-  const origin = originRaw.toLowerCase();
-
-  // CORS: разрешаем только явные origin
-  if (ALLOWED_ORIGINS.has(origin)) {
-    res.setHeader('Access-Control-Allow-Origin', originRaw); // вернуть как пришёл
-    res.setHeader('Vary', 'Origin');
-    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+// --- CORS для фронта на домене ---
+const allowOrigin = (req, res, next) => {
+  const ORIGINS = [
+    'https://narratioglobalteam.com',
+    'https://www.narratioglobalteam.com'
+  ];
+  const origin = req.headers.origin;
+  if (ORIGINS.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  } else {
+    // можно открыть всем на тестовый период
+    res.setHeader('Access-Control-Allow-Origin', '*');
   }
+  res.setHeader('Vary', 'Origin');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  if (req.method === 'OPTIONS') return res.sendStatus(204);
+  next();
+};
+app.use(allowOrigin);
 
-  // Preflight
-  if (req.method === 'OPTIONS') {
-    res.writeHead(204);
-    res.end();
-    return;
-  }
-
-  if (req.url === '/api/health' && req.method === 'GET') {
-    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-    res.end(JSON.stringify({ ok: true, service: 'narratio-backend' }));
-    return;
-  }
-
-  if (req.url === '/api/test' && req.method === 'GET') {
-    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-    res.end(JSON.stringify({ ok: true, service: 'narratio-backend', message: 'test endpoint works' }));
-    return;
-  }
-
-  res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
-  res.end(JSON.stringify({ ok: false, error: 'Not found' }));
+// --- Маршруты проверки ---
+app.get('/api/health', (_req, res) => {
+  res.json({ status: 'ok' });
 });
 
-// Слушаем все интерфейсы (Render)
-server.listen(port, '0.0.0.0', () => {
-  console.log(`[narratio-backend] http://localhost:${port}`);
+app.get('/api/test', (_req, res) => {
+  res.json({ message: 'test ok' });
+});
+
+// корень (на всякий)
+app.get('/', (_req, res) => {
+  res.send('Narratio backend is running');
+});
+
+// --- Старт сервера ---
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Server listening on ${PORT}`);
 });
